@@ -759,6 +759,109 @@ function TodosView({ todos, retreats, loading, activeRetreatId, onCreate, onTogg
 }
 
 /* ============================================================
+   NOTES
+   ============================================================ */
+function NoteForm({ initial, retreats, defaultRetreatId, onSave, onCancel }) {
+  const [f, setF] = useState(initial || { retreat_id: defaultRetreatId || '', content: '' })
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+
+  function submit(e) {
+    e.preventDefault()
+    onSave({ ...f, retreat_id: f.retreat_id || null })
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <div className="form-grid">
+        <div className="field-group full">
+          <label>Retreat (optional)</label>
+          <select value={f.retreat_id} onChange={set('retreat_id')}>
+            <option value="">General</option>
+            {retreats.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </div>
+        <div className="field-group full">
+          <label>Note</label>
+          <textarea value={f.content} onChange={set('content')} required style={{ minHeight: 140 }} autoFocus />
+        </div>
+      </div>
+      <div className="form-actions">
+        <button type="button" className="btn ghost" onClick={onCancel}>Cancel</button>
+        <button type="submit" className="btn clay">Save note</button>
+      </div>
+    </form>
+  )
+}
+
+function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpdate, onDelete }) {
+  const [editing, setEditing] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+
+  const retreatName = (id) => (retreats.find((r) => r.id === id) || {}).name || 'General'
+  const sorted = [...notes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+  return (
+    <div>
+      <div className="section-head">
+        <div>
+          <h2>Notes</h2>
+          <div className="section-sub">{notes.length} {activeRetreatId ? 'for selected retreat' : 'across all retreats'}</div>
+        </div>
+        <button className="btn clay" onClick={() => setEditing('new')}>+ Add note</button>
+      </div>
+
+      {loading ? (
+        <div className="loading-state">Loading notes…</div>
+      ) : sorted.length === 0 ? (
+        <div className="empty-state">No notes yet.</div>
+      ) : (
+        <div className="card-grid">
+          {sorted.map((n) => (
+            <div key={n.id} className="card">
+              <div className="meta-row">
+                {!activeRetreatId && <span>{retreatName(n.retreat_id)}</span>}
+                <span>{fmtDate(n.created_at)}</span>
+              </div>
+              <div className="desc" style={{ whiteSpace: 'pre-wrap' }}>{n.content}</div>
+              <div className="card-actions">
+                <button className="btn sm secondary" onClick={() => setEditing(n)}>Edit</button>
+                <button className="btn sm danger" onClick={() => setConfirmDelete(n)}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <Modal title={editing === 'new' ? 'Add note' : 'Edit note'} onClose={() => setEditing(null)}>
+          <NoteForm
+            initial={editing === 'new' ? null : editing}
+            retreats={retreats}
+            defaultRetreatId={activeRetreatId}
+            onCancel={() => setEditing(null)}
+            onSave={async (data) => {
+              if (editing === 'new') await onCreate(data)
+              else await onUpdate(editing.id, data)
+              setEditing(null)
+            }}
+          />
+        </Modal>
+      )}
+
+      {confirmDelete && (
+        <Modal title="Delete note?" onClose={() => setConfirmDelete(null)}>
+          <p style={{ fontSize: 14 }}>Remove this note? This can't be undone.</p>
+          <div className="form-actions">
+            <button className="btn ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
+            <button className="btn danger" onClick={async () => { await onDelete(confirmDelete.id); setConfirmDelete(null) }}>Delete</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
    APP SHELL
    ============================================================ */
 export default function App() {
@@ -772,24 +875,27 @@ export default function App() {
   const [attendees, setAttendees] = useState([])
   const [expenses, setExpenses] = useState([])
   const [todos, setTodos] = useState([])
-  const [loading, setLoading] = useState({ retreats: true, attendees: true, expenses: true, todos: true })
+  const [notes, setNotes] = useState([])
+  const [loading, setLoading] = useState({ retreats: true, attendees: true, expenses: true, todos: true, notes: true })
   const [errorMsg, setErrorMsg] = useState('')
 
   const loadAll = useCallback(async () => {
     setErrorMsg('')
-    const [r, a, e, t] = await Promise.all([
+    const [r, a, e, t, n] = await Promise.all([
       supabase.from('ssr_retreats').select('*').order('start_date', { ascending: true }),
       supabase.from('ssr_attendees').select('*').order('name', { ascending: true }),
       supabase.from('ssr_expenses').select('*').order('expense_date', { ascending: false }),
       supabase.from('ssr_todos').select('*').order('due_date', { ascending: true }),
+      supabase.from('ssr_notes').select('*').order('created_at', { ascending: false }),
     ])
-    const firstError = [r, a, e, t].find((res) => res.error)
+    const firstError = [r, a, e, t, n].find((res) => res.error)
     if (firstError) setErrorMsg(firstError.error.message)
     setRetreats(r.data || [])
     setAttendees(a.data || [])
     setExpenses(e.data || [])
     setTodos(t.data || [])
-    setLoading({ retreats: false, attendees: false, expenses: false, todos: false })
+    setNotes(n.data || [])
+    setLoading({ retreats: false, attendees: false, expenses: false, todos: false, notes: false })
   }, [])
 
   const checkAllowed = useCallback(async (rawSession) => {
@@ -868,6 +974,10 @@ export default function App() {
     () => (activeRetreatId ? todos.filter((t) => t.retreat_id === activeRetreatId) : todos),
     [todos, activeRetreatId]
   )
+  const filteredNotes = useMemo(
+    () => (activeRetreatId ? notes.filter((n) => n.retreat_id === activeRetreatId) : notes),
+    [notes, activeRetreatId]
+  )
 
   if (!sessionChecked) return null
   if (!session) return <Gate authError={authError} onSubmit={handleLogin} />
@@ -909,6 +1019,9 @@ export default function App() {
         </button>
         <button className={`tab ${tab === 'todos' ? 'active' : ''}`} onClick={() => setTab('todos')}>
           To-dos <span className="count">{filteredTodos.filter((t) => !t.done).length}</span>
+        </button>
+        <button className={`tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => setTab('notes')}>
+          Notes <span className="count">{filteredNotes.length}</span>
         </button>
       </nav>
 
@@ -971,6 +1084,18 @@ export default function App() {
             onToggle={(id, done) => updateRow('ssr_todos', id, { done }, setTodos)}
             onUpdate={(id, data) => updateRow('ssr_todos', id, data, setTodos)}
             onDelete={(id) => deleteRow('ssr_todos', id, setTodos)}
+          />
+        )}
+
+        {tab === 'notes' && (
+          <NotesView
+            notes={filteredNotes}
+            retreats={retreats}
+            loading={loading.notes}
+            activeRetreatId={activeRetreatId}
+            onCreate={(data) => createRow('ssr_notes', data, setNotes)}
+            onUpdate={(id, data) => updateRow('ssr_notes', id, data, setNotes)}
+            onDelete={(id) => deleteRow('ssr_notes', id, setNotes)}
           />
         )}
       </main>
