@@ -8,6 +8,8 @@
   --tide-deep: #3f6863;
   --ocean: #1f3a3d;
   --ocean-deep: #142627;
+  --banner: #16321f;
+  --banner-deep: #0d2013;
   --ink: #2a2622;
   --ink-soft: #6b6357;
   --line: #ddd3bf;
@@ -53,7 +55,7 @@ button {
 }
 
 .app-header {
-  background: var(--ocean);
+  background: var(--banner);
   color: var(--sand);
   padding: 22px 32px 18px;
   display: flex;
@@ -98,7 +100,7 @@ button {
 }
 
 .app-header select {
-  background: var(--ocean-deep);
+  background: var(--banner-deep);
   color: var(--sand);
   border: 1px solid var(--tide-deep);
   border-radius: 6px;
