@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from './supabaseClient'
 
 /* ============================================================
@@ -498,30 +499,60 @@ function ExpenseForm({ initial, retreats, defaultRetreatId, onSave, onCancel }) 
   )
 }
 
-function ExpensesView({ expenses, retreats, loading, activeRetreatId, onCreate, onUpdate, onDelete }) {
+function ExpensesView({ expenses, attendees, retreats, loading, activeRetreatId, onCreate, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
 
-  const total = useMemo(() => expenses.reduce((s, e) => s + Number(e.amount || 0), 0), [expenses])
+  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + Number(e.amount || 0), 0), [expenses])
+  const totalIncome = useMemo(() => attendees.reduce((s, a) => s + Number(a.amount_paid || 0), 0), [attendees])
+  const net = totalIncome - totalExpenses
   const unreimbursed = useMemo(
     () => expenses.filter((e) => !e.reimbursed).reduce((s, e) => s + Number(e.amount || 0), 0),
     [expenses]
   )
   const retreatName = (id) => (retreats.find((r) => r.id === id) || {}).name || 'General'
 
+  const chartData = [
+    { name: 'Income', amount: totalIncome },
+    { name: 'Expenses', amount: totalExpenses },
+  ]
+
   return (
     <div>
       <div className="section-head">
         <div>
-          <h2>Expenses</h2>
-          <div className="section-sub">{expenses.length} entries {activeRetreatId ? 'for selected retreat' : 'across all retreats'}</div>
+          <h2>Bookkeeping</h2>
+          <div className="section-sub">
+            Income from attendee payments · {expenses.length} expense entries {activeRetreatId ? 'for selected retreat' : 'across all retreats'}
+          </div>
         </div>
         <button className="btn clay" onClick={() => setEditing('new')}>+ Add expense</button>
       </div>
 
       <div className="stat-strip">
-        <div className="stat"><div className="label">Total spent</div><div className="value">{money(total)}</div></div>
+        <div className="stat"><div className="label">Income (collected)</div><div className="value good">{money(totalIncome)}</div></div>
+        <div className="stat"><div className="label">Total expenses</div><div className="value">{money(totalExpenses)}</div></div>
+        <div className="stat"><div className="label">Net</div><div className={`value ${net >= 0 ? 'good' : 'bad'}`}>{money(net)}</div></div>
         <div className="stat"><div className="label">Unreimbursed</div><div className={`value ${unreimbursed > 0 ? 'bad' : 'good'}`}>{money(unreimbursed)}</div></div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 22, height: 280 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#ddd3bf" />
+            <XAxis dataKey="name" tick={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fill: '#6b6357' }} />
+            <YAxis tick={{ fontFamily: 'DM Mono, monospace', fontSize: 11, fill: '#6b6357' }} tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
+            <Tooltip
+              formatter={(value) => money(value)}
+              contentStyle={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, border: '1px solid #ddd3bf', borderRadius: 8 }}
+            />
+            <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
+              {chartData.map((entry, i) => (
+                <Cell key={entry.name} fill={i === 0 ? '#4b7a5a' : '#a8493a'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       {loading ? (
@@ -874,7 +905,7 @@ export default function App() {
           Attendees <span className="count">{filteredAttendees.length}</span>
         </button>
         <button className={`tab ${tab === 'expenses' ? 'active' : ''}`} onClick={() => setTab('expenses')}>
-          Expenses <span className="count">{filteredExpenses.length}</span>
+          Bookkeeping <span className="count">{filteredExpenses.length}</span>
         </button>
         <button className={`tab ${tab === 'todos' ? 'active' : ''}`} onClick={() => setTab('todos')}>
           To-dos <span className="count">{filteredTodos.filter((t) => !t.done).length}</span>
@@ -920,6 +951,7 @@ export default function App() {
         {tab === 'expenses' && (
           <ExpensesView
             expenses={filteredExpenses}
+            attendees={filteredAttendees}
             retreats={retreats}
             loading={loading.expenses}
             activeRetreatId={activeRetreatId}
