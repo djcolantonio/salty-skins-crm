@@ -172,7 +172,7 @@ function RetreatsView({ retreats, loading, onCreate, onUpdate, onDelete, activeR
       {loading ? (
         <div className="loading-state">Loading retreats…</div>
       ) : retreats.length === 0 ? (
-        <div className="empty-state">No retreats yet. Create your first one to start tracking attendees, expenses, and tasks.</div>
+        <div className="empty-state">No retreats yet. Create your first one to start tracking guests, expenses, and tasks.</div>
       ) : (
         <div className="card-grid">
           {retreats.map((r) => (
@@ -217,7 +217,7 @@ function RetreatsView({ retreats, loading, onCreate, onUpdate, onDelete, activeR
       {confirmDelete && (
         <Modal title="Delete retreat?" onClose={() => setConfirmDelete(null)}>
           <p style={{ fontSize: 14 }}>
-            This will delete <strong>{confirmDelete.name}</strong> and all of its attendees and to-dos. Expenses linked to it will be kept but unlinked. This can't be undone.
+            This will delete <strong>{confirmDelete.name}</strong> and all of its guests and tasks. Expenses linked to it will be kept but unlinked. This can't be undone.
           </p>
           <div className="form-actions">
             <button className="btn ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
@@ -312,7 +312,7 @@ function AttendeeForm({ initial, retreats, defaultRetreatId, onSave, onCancel })
       </div>
       <div className="form-actions">
         <button type="button" className="btn ghost" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="btn clay">Save attendee</button>
+        <button type="submit" className="btn clay">Save guest</button>
       </div>
     </form>
   )
@@ -329,20 +329,20 @@ function AttendeesView({ attendees, retreats, loading, activeRetreatId, onCreate
     <div>
       <div className="section-head">
         <div>
-          <h2>Attendees</h2>
+          <h2>Guests</h2>
           <div className="section-sub">
             {attendees.length} {activeRetreatId ? 'for selected retreat' : 'across all retreats'}
           </div>
         </div>
-        <button className="btn clay" disabled={retreats.length === 0} onClick={() => setEditing('new')}>+ Add attendee</button>
+        <button className="btn clay" disabled={retreats.length === 0} onClick={() => setEditing('new')}>+ Add guest</button>
       </div>
 
       {retreats.length === 0 ? (
-        <div className="empty-state">Create a retreat first, then add attendees to it.</div>
+        <div className="empty-state">Create a retreat first, then add guests to it.</div>
       ) : loading ? (
-        <div className="loading-state">Loading attendees…</div>
+        <div className="loading-state">Loading guests…</div>
       ) : attendees.length === 0 ? (
-        <div className="empty-state">No attendees yet for this view.</div>
+        <div className="empty-state">No guests yet for this view.</div>
       ) : (
         <div className="table-wrap">
           <table>
@@ -411,7 +411,7 @@ function AttendeesView({ attendees, retreats, loading, activeRetreatId, onCreate
       )}
 
       {editing && (
-        <Modal title={editing === 'new' ? 'Add attendee' : 'Edit attendee'} onClose={() => setEditing(null)}>
+        <Modal title={editing === 'new' ? 'Add guest' : 'Edit guest'} onClose={() => setEditing(null)}>
           <AttendeeForm
             initial={editing === 'new' ? null : editing}
             retreats={retreats}
@@ -427,7 +427,7 @@ function AttendeesView({ attendees, retreats, loading, activeRetreatId, onCreate
       )}
 
       {confirmDelete && (
-        <Modal title="Delete attendee?" onClose={() => setConfirmDelete(null)}>
+        <Modal title="Delete guest?" onClose={() => setConfirmDelete(null)}>
           <p style={{ fontSize: 14 }}>Remove <strong>{confirmDelete.name}</strong>? This can't be undone.</p>
           <div className="form-actions">
             <button className="btn ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
@@ -523,7 +523,7 @@ function ExpensesView({ expenses, attendees, retreats, loading, activeRetreatId,
         <div>
           <h2>Bookkeeping</h2>
           <div className="section-sub">
-            Income from attendee payments · {expenses.length} expense entries {activeRetreatId ? 'for selected retreat' : 'across all retreats'}
+            Income from guest payments · {expenses.length} expense entries {activeRetreatId ? 'for selected retreat' : 'across all retreats'}
           </div>
         </div>
         <button className="btn clay" onClick={() => setEditing('new')}>+ Add expense</button>
@@ -692,7 +692,7 @@ function TodosView({ todos, retreats, loading, activeRetreatId, onCreate, onTogg
     <div>
       <div className="section-head">
         <div>
-          <h2>To-dos</h2>
+          <h2>Tasks</h2>
           <div className="section-sub">{todos.filter((t) => !t.done).length} open · {todos.length} total</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -862,6 +862,37 @@ function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpda
 }
 
 /* ============================================================
+   ICONS (minimal line icons for the sidebar nav)
+   ============================================================ */
+const iconProps = { viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }
+const RetreatsIcon = () => (<svg {...iconProps}><path d="M4 8.5 10 4l6 4.5" /><path d="M5.5 8v7.5h9V8" /><path d="M8.3 15.5v-4h3.4v4" /></svg>)
+const GuestsIcon = () => (<svg {...iconProps}><circle cx="7.5" cy="7" r="2.6" /><path d="M2.8 16c.6-2.7 2.4-4.2 4.7-4.2S11.8 13.3 12.4 16" /><circle cx="14.2" cy="7.6" r="2" /><path d="M13 11.9c1.9.2 3.2 1.6 3.7 4" /></svg>)
+const FinancesIcon = () => (<svg {...iconProps}><rect x="3" y="4" width="4" height="12" rx="0.8" /><rect x="8.5" y="8" width="4" height="8" rx="0.8" /><rect x="14" y="6" width="3" height="10" rx="0.8" /></svg>)
+const TasksIcon = () => (<svg {...iconProps}><path d="M4 10.5l3 3 8-8" /></svg>)
+const NotesIcon = () => (<svg {...iconProps}><path d="M4 3.5h9L16 6.5V16.5H4z" /><path d="M13 3.5V7h3" /><path d="M6.5 10h5M6.5 12.5h5" /></svg>)
+
+const TAB_META = {
+  retreats: { label: 'Retreats', icon: RetreatsIcon, eyebrow: 'Trips', title: 'Retreats' },
+  attendees: { label: 'Guests', icon: GuestsIcon, eyebrow: 'Roster', title: 'Guests' },
+  expenses: { label: 'Finances', icon: FinancesIcon, eyebrow: 'Bookkeeping', title: 'Finances' },
+  todos: { label: 'Tasks', icon: TasksIcon, eyebrow: 'Follow-through', title: 'Tasks' },
+  notes: { label: 'Notes', icon: NotesIcon, eyebrow: 'Freeform', title: 'Notes' },
+}
+
+function daysAway(dateStr) {
+  if (!dateStr) return null
+  const target = new Date(dateStr)
+  const today = new Date()
+  target.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+  const diff = Math.round((target - today) / 86400000)
+  if (diff < 0) return null
+  if (diff === 0) return 'Today'
+  if (diff === 1) return '1 day away'
+  return `${diff} days away`
+}
+
+/* ============================================================
    APP SHELL
    ============================================================ */
 export default function App() {
@@ -990,52 +1021,57 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="brand">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
           <h1>Salty Skins</h1>
-          <span className="tag">Ops CRM</span>
+          <div className="tag">Retreat Operations</div>
         </div>
-        <div className="retreat-picker">
-          <span>Viewing:</span>
-          <select value={activeRetreatId || ''} onChange={(e) => setActiveRetreatId(e.target.value || null)}>
+
+        <nav className="sidebar-nav">
+          {Object.entries(TAB_META).map(([key, meta]) => {
+            const Icon = meta.icon
+            return (
+              <button key={key} className={`nav-item ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>
+                <Icon />
+                {meta.label}
+              </button>
+            )
+          })}
+        </nav>
+
+        <div className="sidebar-spacer" />
+
+        <div className="sidebar-footer">
+          <div className="sidebar-filter-label">Viewing</div>
+          {activeRetreat ? (
+            <>
+              <div className="sidebar-retreat-name">{activeRetreat.name}</div>
+              <div className="sidebar-retreat-dates">{fmtDate(activeRetreat.start_date)} – {fmtDate(activeRetreat.end_date)}</div>
+              {daysAway(activeRetreat.start_date) && <span className="sidebar-days-pill">{daysAway(activeRetreat.start_date)}</span>}
+            </>
+          ) : (
+            <div className="sidebar-retreat-name">All retreats</div>
+          )}
+          <select className="sidebar-retreat-select" value={activeRetreatId || ''} onChange={(e) => setActiveRetreatId(e.target.value || null)}>
             <option value="">All retreats</option>
             {retreats.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
-          <button className="btn sm ghost" onClick={logout} style={{ borderColor: 'var(--tide-deep)', color: 'var(--sand-deep)' }}>
-            Log out
-          </button>
+          <button className="sidebar-logout" onClick={logout}>Log out</button>
         </div>
-      </header>
+      </aside>
 
-      <nav className="tabs">
-        <button className={`tab ${tab === 'retreats' ? 'active' : ''}`} onClick={() => setTab('retreats')}>
-          Retreats <span className="count">{retreats.length}</span>
-        </button>
-        <button className={`tab ${tab === 'attendees' ? 'active' : ''}`} onClick={() => setTab('attendees')}>
-          Attendees <span className="count">{filteredAttendees.length}</span>
-        </button>
-        <button className={`tab ${tab === 'expenses' ? 'active' : ''}`} onClick={() => setTab('expenses')}>
-          Bookkeeping <span className="count">{filteredExpenses.length}</span>
-        </button>
-        <button className={`tab ${tab === 'todos' ? 'active' : ''}`} onClick={() => setTab('todos')}>
-          To-dos <span className="count">{filteredTodos.filter((t) => !t.done).length}</span>
-        </button>
-        <button className={`tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => setTab('notes')}>
-          Notes <span className="count">{filteredNotes.length}</span>
-        </button>
-      </nav>
-
-      <main className="main">
-        {errorMsg && (
-          <div className="empty-state" style={{ color: 'var(--bad)', border: '1px solid var(--bad)', borderRadius: 10, marginBottom: 16 }}>
-            {errorMsg}
-          </div>
-        )}
-        {activeRetreat && (
-          <div className="section-sub" style={{ marginBottom: 12 }}>
-            Filtered to <strong>{activeRetreat.name}</strong> — <button className="btn sm ghost" onClick={() => setActiveRetreatId(null)}>clear filter</button>
-          </div>
-        )}
+      <div className="content-area">
+        <main className="main">
+          {errorMsg && (
+            <div className="empty-state" style={{ color: 'var(--bad)', border: '1px solid var(--bad)', borderRadius: 10, marginBottom: 16 }}>
+              {errorMsg}
+            </div>
+          )}
+          {activeRetreat && (
+            <div className="section-sub" style={{ marginBottom: 12 }}>
+              Filtered to <strong>{activeRetreat.name}</strong> — <button className="btn sm ghost" onClick={() => setActiveRetreatId(null)}>clear filter</button>
+            </div>
+          )}
 
         {tab === 'retreats' && (
           <RetreatsView
@@ -1099,6 +1135,7 @@ export default function App() {
           />
         )}
       </main>
+      </div>
     </div>
   )
 }
