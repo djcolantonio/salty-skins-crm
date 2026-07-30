@@ -241,7 +241,7 @@ function AttendeeForm({ initial, retreats, defaultRetreatId, onSave, onCancel })
     arrival_airline: '', arrival_flight_number: '', arrival_datetime: '', arrival_airport: '',
     departure_airline: '', departure_flight_number: '', departure_datetime: '', departure_airport: '',
     payment_status: 'pending', amount_paid: '',
-    dietary_notes: '', notes: '',
+    dietary_notes: '', notes: '', pickup_set: false,
   })
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
@@ -295,6 +295,10 @@ function AttendeeForm({ initial, retreats, defaultRetreatId, onSave, onCancel })
             <div className="field-group"><label>Flight #</label><input value={f.arrival_flight_number} onChange={set('arrival_flight_number')} /></div>
             <div className="field-group"><label>Arrival date/time</label><input type="datetime-local" value={f.arrival_datetime} onChange={set('arrival_datetime')} /></div>
             <div className="field-group"><label>Arrival airport</label><input value={f.arrival_airport} onChange={set('arrival_airport')} placeholder="NAP" /></div>
+            <div className="field-group full" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" style={{ width: 'auto' }} checked={!!f.pickup_set} onChange={(e) => setF({ ...f, pickup_set: e.target.checked })} id="pickup_set" />
+              <label htmlFor="pickup_set" style={{ margin: 0 }}>Airport pickup arranged</label>
+            </div>
           </div>
         </fieldset>
 
@@ -872,6 +876,7 @@ function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpda
    ICONS (minimal line icons for the sidebar nav)
    ============================================================ */
 const iconProps = { viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }
+const OverviewIcon = () => (<svg {...iconProps}><circle cx="10" cy="10" r="6.5" /><circle cx="10" cy="10" r="1.6" fill="currentColor" stroke="none" /></svg>)
 const RetreatsIcon = () => (<svg {...iconProps}><path d="M4 8.5 10 4l6 4.5" /><path d="M5.5 8v7.5h9V8" /><path d="M8.3 15.5v-4h3.4v4" /></svg>)
 const GuestsIcon = () => (<svg {...iconProps}><circle cx="7.5" cy="7" r="2.6" /><path d="M2.8 16c.6-2.7 2.4-4.2 4.7-4.2S11.8 13.3 12.4 16" /><circle cx="14.2" cy="7.6" r="2" /><path d="M13 11.9c1.9.2 3.2 1.6 3.7 4" /></svg>)
 const FinancesIcon = () => (<svg {...iconProps}><rect x="3" y="4" width="4" height="12" rx="0.8" /><rect x="8.5" y="8" width="4" height="8" rx="0.8" /><rect x="14" y="6" width="3" height="10" rx="0.8" /></svg>)
@@ -879,6 +884,7 @@ const TasksIcon = () => (<svg {...iconProps}><path d="M4 10.5l3 3 8-8" /></svg>)
 const NotesIcon = () => (<svg {...iconProps}><path d="M4 3.5h9L16 6.5V16.5H4z" /><path d="M13 3.5V7h3" /><path d="M6.5 10h5M6.5 12.5h5" /></svg>)
 
 const TAB_META = {
+  overview: { label: 'Overview', icon: OverviewIcon, eyebrow: 'Today', title: 'Overview' },
   retreats: { label: 'Retreats', icon: RetreatsIcon, eyebrow: 'Trips', title: 'Retreats' },
   attendees: { label: 'Guests', icon: GuestsIcon, eyebrow: 'Roster', title: 'Guests' },
   expenses: { label: 'Finances', icon: FinancesIcon, eyebrow: 'Bookkeeping', title: 'Finances' },
@@ -899,6 +905,234 @@ function daysAway(dateStr) {
   return `${diff} days away`
 }
 
+function dueLabel(dateStr) {
+  if (!dateStr) return 'No due date'
+  const target = new Date(dateStr)
+  const today = new Date()
+  target.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+  const diff = Math.round((target - today) / 86400000)
+  if (diff < 0) return 'Overdue'
+  if (diff === 0) return 'Due today'
+  if (diff === 1) return 'Due tomorrow'
+  return `Due ${fmtDate(dateStr)}`
+}
+
+function greetingName(email) {
+  if (!email) return 'there'
+  const local = email.split('@')[0]
+  const first = local.split(/[._-]/)[0]
+  return first.charAt(0).toUpperCase() + first.slice(1)
+}
+
+function initialsFromEmail(email) {
+  if (!email) return '?'
+  const local = email.split('@')[0]
+  const parts = local.split(/[._-]/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return local.slice(0, 2).toUpperCase()
+}
+
+function greetingTime() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+/* ============================================================
+   OVERVIEW
+   ============================================================ */
+function OverviewView({ retreats, attendees, expenses, todos, userEmail, activeRetreatId, onToggleTodo, onTogglePickup, onGoToTab, onSelectRetreat }) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const featured = useMemo(() => {
+    if (activeRetreatId) return retreats.find((r) => r.id === activeRetreatId) || null
+    if (retreats.length === 0) return null
+    const ongoing = retreats.find((r) => r.start_date && r.end_date && new Date(r.start_date) <= today && new Date(r.end_date) >= today)
+    if (ongoing) return ongoing
+    const upcoming = retreats
+      .filter((r) => r.start_date && new Date(r.start_date) >= today)
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+    if (upcoming.length > 0) return upcoming[0]
+    return [...retreats].sort((a, b) => new Date(b.start_date || 0) - new Date(a.start_date || 0))[0]
+  }, [retreats, activeRetreatId])
+
+  const retreatAttendees = useMemo(
+    () => (featured ? attendees.filter((a) => a.retreat_id === featured.id) : []),
+    [attendees, featured]
+  )
+  const retreatExpenses = useMemo(
+    () => (featured ? expenses.filter((e) => e.retreat_id === featured.id) : []),
+    [expenses, featured]
+  )
+
+  const price = Number(featured?.price || 0)
+  const guestsConfirmed = retreatAttendees.length
+  const capacity = featured?.capacity ?? null
+  const expectedIncome = guestsConfirmed * price
+  const collected = retreatAttendees.reduce((s, a) => s + Number(a.amount_paid || 0), 0)
+  const outstanding = Math.max(expectedIncome - collected, 0)
+  const unpaidCount = price > 0 ? retreatAttendees.filter((a) => Number(a.amount_paid || 0) < price).length : 0
+  const totalExpenses = retreatExpenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const profit = expectedIncome - totalExpenses
+  const margin = expectedIncome > 0 ? (profit / expectedIncome) * 100 : null
+  const capacityPct = capacity ? Math.min((guestsConfirmed / capacity) * 100, 100) : 0
+
+  const arrivals = useMemo(
+    () => retreatAttendees.filter((a) => a.arrival_datetime).sort((a, b) => new Date(a.arrival_datetime) - new Date(b.arrival_datetime)).slice(0, 5),
+    [retreatAttendees]
+  )
+  const priorities = useMemo(
+    () => [...todos].filter((t) => !t.done).sort((a, b) => {
+      const da = a.due_date ? new Date(a.due_date).getTime() : Infinity
+      const db = b.due_date ? new Date(b.due_date).getTime() : Infinity
+      return da - db
+    }).slice(0, 5),
+    [todos]
+  )
+  const upcomingRetreats = useMemo(
+    () => retreats.filter((r) => r.id !== featured?.id).sort((a, b) => new Date(a.start_date || 0) - new Date(b.start_date || 0)).slice(0, 4),
+    [retreats, featured]
+  )
+
+  const chartData = [
+    { name: 'Income', amount: expectedIncome },
+    { name: 'Costs', amount: totalExpenses },
+  ]
+
+  return (
+    <div>
+      <div className="page-eyebrow">{today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}</div>
+      <div className="overview-greeting-row">
+        <h1 className="page-title">{greetingTime()}, {greetingName(userEmail)}.</h1>
+        <div className="avatar-circle">{initialsFromEmail(userEmail)}</div>
+      </div>
+
+      {!featured ? (
+        <div className="empty-state">No retreats yet — add one to see your overview.</div>
+      ) : (
+        <>
+          <div className="hero-banner">
+            <div className="hero-eyebrow">
+              {featured.start_date && new Date(featured.start_date) <= today && new Date(featured.end_date) >= today ? 'Active retreat' : 'Upcoming retreat'}
+            </div>
+            <div className="hero-title">{featured.name}</div>
+            <div className="hero-sub">
+              {fmtDate(featured.start_date)} – {fmtDate(featured.end_date)}{featured.location ? ` · ${featured.location}` : ''}
+            </div>
+            {daysAway(featured.start_date) && <span className="hero-days-pill">{daysAway(featured.start_date)}</span>}
+          </div>
+
+          <div className="stat-strip">
+            <div className="stat">
+              <div className="label">Guests confirmed</div>
+              <div className="value">{guestsConfirmed}{capacity != null && <span style={{ fontSize: 16, fontStyle: 'normal', color: 'var(--ink-soft)' }}> / {capacity}</span>}</div>
+              <div className="section-sub">{capacity != null ? `${Math.max(capacity - guestsConfirmed, 0)} remaining spaces` : 'No capacity set'}</div>
+              {capacity != null && <div className="progress-track"><div className="progress-fill" style={{ width: `${capacityPct}%` }} /></div>}
+            </div>
+            <div className="stat">
+              <div className="label">Collected</div>
+              <div className="value good">{money(collected)}</div>
+              <div className="section-sub">{price > 0 ? `of ${money(expectedIncome)} expected` : 'No price set'}</div>
+            </div>
+            <div className="stat">
+              <div className="label">Outstanding</div>
+              <div className={`value ${outstanding > 0 ? 'bad' : 'good'}`}>{money(outstanding)}</div>
+              <div className="section-sub">{unpaidCount} guest balance{unpaidCount === 1 ? '' : 's'}</div>
+            </div>
+            <div className="stat">
+              <div className="label">Projected profit</div>
+              <div className={`value ${profit >= 0 ? 'good' : 'bad'}`}>{money(profit)}</div>
+              <div className="section-sub">{margin != null ? `${margin.toFixed(1)}% margin` : '—'}</div>
+            </div>
+          </div>
+
+          <div className="overview-grid">
+            <div className="card overview-panel">
+              <div className="panel-head">
+                <h3 className="panel-title">Arrival board</h3>
+                <button className="link-btn" onClick={() => onGoToTab('attendees')}>View all guests</button>
+              </div>
+              {arrivals.length === 0 ? (
+                <div className="empty-state">No arrival details yet.</div>
+              ) : arrivals.map((a) => (
+                <div key={a.id} className="arrival-row">
+                  <div>
+                    <div className="arrival-name">{a.name}</div>
+                    <div className="arrival-meta">{[a.arrival_flight_number, a.arrival_airport, fmtDateTime(a.arrival_datetime)].filter(Boolean).join(' · ')}</div>
+                  </div>
+                  <button className={`pickup-badge ${a.pickup_set ? 'set' : 'needed'}`} onClick={() => onTogglePickup(a.id, !a.pickup_set)}>
+                    {a.pickup_set ? 'Pickup set' : 'Driver needed'}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="card overview-panel">
+              <div className="panel-head">
+                <h3 className="panel-title">Today's priorities</h3>
+                <button className="link-btn" onClick={() => onGoToTab('todos')}>All tasks</button>
+              </div>
+              {priorities.length === 0 ? (
+                <div className="empty-state">Nothing pending.</div>
+              ) : priorities.map((t) => (
+                <div key={t.id} className="priority-row">
+                  <button className="todo-check" onClick={() => onToggleTodo(t.id, true)} />
+                  <div>
+                    <div className="task-text">{t.task}</div>
+                    <div className="task-meta"><span>{dueLabel(t.due_date)}</span><span className={`badge ${t.priority}`}>{t.priority}</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="overview-grid">
+            <div className="card overview-panel">
+              <div className="panel-head">
+                <h3 className="panel-title">Retreat financial health</h3>
+                <span className="subtext">Projected</span>
+              </div>
+              <div style={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e6ddc7" />
+                    <XAxis dataKey="name" tick={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fill: '#8a8172' }} />
+                    <YAxis tick={{ fontFamily: 'DM Mono, monospace', fontSize: 11, fill: '#8a8172' }} tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`} />
+                    <Tooltip formatter={(value) => money(value)} contentStyle={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, border: '1px solid #e6ddc7', borderRadius: 8 }} />
+                    <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
+                      {chartData.map((entry, i) => (<Cell key={entry.name} fill={i === 0 ? '#2f4a3d' : '#c1673f'} />))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="card overview-panel">
+              <div className="panel-head">
+                <h3 className="panel-title">Upcoming retreats</h3>
+                <button className="link-btn" onClick={() => onGoToTab('retreats')}>All retreats</button>
+              </div>
+              {upcomingRetreats.length === 0 ? (
+                <div className="empty-state">Nothing else on the calendar.</div>
+              ) : upcomingRetreats.map((r) => (
+                <button key={r.id} className="upcoming-retreat-row" onClick={() => onSelectRetreat(r.id)}>
+                  <div className="upcoming-retreat-name">{r.name}</div>
+                  <div className="upcoming-retreat-meta">
+                    {fmtDate(r.start_date)} – {fmtDate(r.end_date)} · {attendees.filter((a) => a.retreat_id === r.id).length} guests confirmed
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /* ============================================================
    APP SHELL
    ============================================================ */
@@ -906,7 +1140,7 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [sessionChecked, setSessionChecked] = useState(false)
   const [authError, setAuthError] = useState('')
-  const [tab, setTab] = useState('retreats')
+  const [tab, setTab] = useState('overview')
   const [activeRetreatId, setActiveRetreatId] = useState(null)
 
   const [retreats, setRetreats] = useState([])
@@ -1079,6 +1313,21 @@ export default function App() {
               Filtered to <strong>{activeRetreat.name}</strong> — <button className="btn sm ghost" onClick={() => setActiveRetreatId(null)}>clear filter</button>
             </div>
           )}
+
+        {tab === 'overview' && (
+          <OverviewView
+            retreats={retreats}
+            attendees={attendees}
+            expenses={expenses}
+            todos={todos}
+            userEmail={session.user.email}
+            activeRetreatId={activeRetreatId}
+            onToggleTodo={(id, done) => updateRow('ssr_todos', id, { done }, setTodos)}
+            onTogglePickup={(id, pickup_set) => updateRow('ssr_attendees', id, { pickup_set }, setAttendees)}
+            onGoToTab={setTab}
+            onSelectRetreat={setActiveRetreatId}
+          />
+        )}
 
         {tab === 'retreats' && (
           <RetreatsView
