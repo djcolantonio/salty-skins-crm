@@ -106,6 +106,8 @@ function RetreatForm({ initial, onSave, onCancel }) {
       ...f,
       price: f.price === '' ? null : Number(f.price),
       capacity: f.capacity === '' ? null : parseInt(f.capacity, 10),
+      start_date: f.start_date || null,
+      end_date: f.end_date || null,
     })
   }
 
@@ -245,7 +247,12 @@ function AttendeeForm({ initial, retreats, defaultRetreatId, onSave, onCancel })
 
   function submit(e) {
     e.preventDefault()
-    onSave({ ...f, amount_paid: f.amount_paid === '' ? 0 : Number(f.amount_paid) })
+    onSave({
+      ...f,
+      amount_paid: f.amount_paid === '' ? 0 : Number(f.amount_paid),
+      arrival_datetime: f.arrival_datetime || null,
+      departure_datetime: f.departure_datetime || null,
+    })
   }
 
   return (
@@ -451,7 +458,7 @@ function ExpenseForm({ initial, retreats, defaultRetreatId, onSave, onCancel }) 
 
   function submit(e) {
     e.preventDefault()
-    onSave({ ...f, retreat_id: f.retreat_id || null, amount: Number(f.amount || 0) })
+    onSave({ ...f, retreat_id: f.retreat_id || null, amount: Number(f.amount || 0), expense_date: f.expense_date || null })
   }
 
   return (
@@ -638,7 +645,7 @@ function TodoForm({ initial, retreats, defaultRetreatId, onSave, onCancel }) {
 
   function submit(e) {
     e.preventDefault()
-    onSave({ ...f, retreat_id: f.retreat_id || null })
+    onSave({ ...f, retreat_id: f.retreat_id || null, due_date: f.due_date || null })
   }
 
   return (
