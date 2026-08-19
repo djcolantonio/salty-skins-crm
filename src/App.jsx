@@ -241,7 +241,7 @@ function AttendeeForm({ initial, retreats, defaultRetreatId, onSave, onCancel })
     arrival_airline: '', arrival_flight_number: '', arrival_datetime: '', arrival_airport: '',
     departure_airline: '', departure_flight_number: '', departure_datetime: '', departure_airport: '',
     payment_status: 'pending', amount_paid: '',
-    dietary_notes: '', notes: '', pickup_set: false,
+    dietary_notes: '', notes: '',
   })
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
@@ -295,10 +295,6 @@ function AttendeeForm({ initial, retreats, defaultRetreatId, onSave, onCancel })
             <div className="field-group"><label>Flight #</label><input value={f.arrival_flight_number} onChange={set('arrival_flight_number')} /></div>
             <div className="field-group"><label>Arrival date/time</label><input type="datetime-local" value={f.arrival_datetime} onChange={set('arrival_datetime')} /></div>
             <div className="field-group"><label>Arrival airport</label><input value={f.arrival_airport} onChange={set('arrival_airport')} placeholder="NAP" /></div>
-            <div className="field-group full" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" style={{ width: 'auto' }} checked={!!f.pickup_set} onChange={(e) => setF({ ...f, pickup_set: e.target.checked })} id="pickup_set" />
-              <label htmlFor="pickup_set" style={{ margin: 0 }}>Airport pickup arranged</label>
-            </div>
           </div>
         </fieldset>
 
@@ -445,6 +441,73 @@ function AttendeesView({ attendees, retreats, loading, activeRetreatId, onCreate
             <button className="btn danger" onClick={async () => { await onDelete(confirmDelete.id); setConfirmDelete(null) }}>Delete</button>
           </div>
         </Modal>
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
+   FLIGHTS
+   ============================================================ */
+function FlightsView({ attendees, retreats, loading, activeRetreatId }) {
+  const retreatName = (id) => (retreats.find((r) => r.id === id) || {}).name || '—'
+
+  const sorted = useMemo(() => {
+    return [...attendees].sort((a, b) => {
+      const da = a.arrival_datetime ? new Date(a.arrival_datetime).getTime() : Infinity
+      const db = b.arrival_datetime ? new Date(b.arrival_datetime).getTime() : Infinity
+      if (da !== db) return da - db
+      return a.name.localeCompare(b.name)
+    })
+  }, [attendees])
+
+  const flightLine = (airline, flightNum, airport, when) => {
+    const parts = [airline, flightNum, airport].filter(Boolean)
+    if (parts.length === 0 && !when) return '—'
+    return (
+      <>
+        <div>{parts.length ? parts.join(' · ') : 'Flight details TBD'}</div>
+        {when && <div className="subtext">{fmtDateTime(when)}</div>}
+      </>
+    )
+  }
+
+  return (
+    <div>
+      <div className="section-head">
+        <div>
+          <h2>Flights</h2>
+          <div className="section-sub">{attendees.length} guests {activeRetreatId ? 'for selected retreat' : 'across all retreats'}</div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading-state">Loading flights…</div>
+      ) : sorted.length === 0 ? (
+        <div className="empty-state">No guests yet — add guests to see their flight details here.</div>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Guest</th>
+                {!activeRetreatId && <th>Retreat</th>}
+                <th>Arrival</th>
+                <th>Departure</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((a) => (
+                <tr key={a.id}>
+                  <td><strong>{a.name}</strong></td>
+                  {!activeRetreatId && <td>{retreatName(a.retreat_id)}</td>}
+                  <td>{flightLine(a.arrival_airline, a.arrival_flight_number, a.arrival_airport, a.arrival_datetime)}</td>
+                  <td>{flightLine(a.departure_airline, a.departure_flight_number, a.departure_airport, a.departure_datetime)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )
@@ -879,6 +942,7 @@ const iconProps = { viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', 
 const OverviewIcon = () => (<svg {...iconProps}><circle cx="10" cy="10" r="6.5" /><circle cx="10" cy="10" r="1.6" fill="currentColor" stroke="none" /></svg>)
 const RetreatsIcon = () => (<svg {...iconProps}><path d="M4 8.5 10 4l6 4.5" /><path d="M5.5 8v7.5h9V8" /><path d="M8.3 15.5v-4h3.4v4" /></svg>)
 const GuestsIcon = () => (<svg {...iconProps}><circle cx="7.5" cy="7" r="2.6" /><path d="M2.8 16c.6-2.7 2.4-4.2 4.7-4.2S11.8 13.3 12.4 16" /><circle cx="14.2" cy="7.6" r="2" /><path d="M13 11.9c1.9.2 3.2 1.6 3.7 4" /></svg>)
+const FlightsIcon = () => (<svg {...iconProps}><path d="M11.2 3.3a1.2 1.2 0 0 1 2 .9v4l4.3 2.7v1.6l-4.3-1.2v3.6l1.6 1.2v1.3l-2.8-.8-2.8.8v-1.3l1.6-1.2v-3.6l-4.3 1.2v-1.6L11 8.2v-4c0-.36.08-.68.2-.9z" /></svg>)
 const FinancesIcon = () => (<svg {...iconProps}><rect x="3" y="4" width="4" height="12" rx="0.8" /><rect x="8.5" y="8" width="4" height="8" rx="0.8" /><rect x="14" y="6" width="3" height="10" rx="0.8" /></svg>)
 const TasksIcon = () => (<svg {...iconProps}><path d="M4 10.5l3 3 8-8" /></svg>)
 const NotesIcon = () => (<svg {...iconProps}><path d="M4 3.5h9L16 6.5V16.5H4z" /><path d="M13 3.5V7h3" /><path d="M6.5 10h5M6.5 12.5h5" /></svg>)
@@ -887,6 +951,7 @@ const TAB_META = {
   overview: { label: 'Overview', icon: OverviewIcon, eyebrow: 'Today', title: 'Overview' },
   retreats: { label: 'Retreats', icon: RetreatsIcon, eyebrow: 'Trips', title: 'Retreats' },
   attendees: { label: 'Guests', icon: GuestsIcon, eyebrow: 'Roster', title: 'Guests' },
+  flights: { label: 'Flights', icon: FlightsIcon, eyebrow: 'Travel', title: 'Flights' },
   expenses: { label: 'Finances', icon: FinancesIcon, eyebrow: 'Bookkeeping', title: 'Finances' },
   todos: { label: 'Tasks', icon: TasksIcon, eyebrow: 'Follow-through', title: 'Tasks' },
   notes: { label: 'Notes', icon: NotesIcon, eyebrow: 'Freeform', title: 'Notes' },
@@ -943,7 +1008,7 @@ function greetingTime() {
 /* ============================================================
    OVERVIEW
    ============================================================ */
-function OverviewView({ retreats, attendees, expenses, todos, userEmail, activeRetreatId, onToggleTodo, onTogglePickup, onGoToTab, onSelectRetreat }) {
+function OverviewView({ retreats, attendees, expenses, todos, userEmail, activeRetreatId, onToggleTodo, onGoToTab, onSelectRetreat }) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -980,10 +1045,6 @@ function OverviewView({ retreats, attendees, expenses, todos, userEmail, activeR
   const margin = expectedIncome > 0 ? (profit / expectedIncome) * 100 : null
   const capacityPct = capacity ? Math.min((guestsConfirmed / capacity) * 100, 100) : 0
 
-  const arrivals = useMemo(
-    () => retreatAttendees.filter((a) => a.arrival_datetime).sort((a, b) => new Date(a.arrival_datetime) - new Date(b.arrival_datetime)).slice(0, 5),
-    [retreatAttendees]
-  )
   const priorities = useMemo(
     () => [...todos].filter((t) => !t.done).sort((a, b) => {
       const da = a.due_date ? new Date(a.due_date).getTime() : Infinity
@@ -1052,26 +1113,6 @@ function OverviewView({ retreats, attendees, expenses, todos, userEmail, activeR
           <div className="overview-grid">
             <div className="card overview-panel">
               <div className="panel-head">
-                <h3 className="panel-title">Arrival board</h3>
-                <button className="link-btn" onClick={() => onGoToTab('attendees')}>View all guests</button>
-              </div>
-              {arrivals.length === 0 ? (
-                <div className="empty-state">No arrival details yet.</div>
-              ) : arrivals.map((a) => (
-                <div key={a.id} className="arrival-row">
-                  <div>
-                    <div className="arrival-name">{a.name}</div>
-                    <div className="arrival-meta">{[a.arrival_flight_number, a.arrival_airport, fmtDateTime(a.arrival_datetime)].filter(Boolean).join(' · ')}</div>
-                  </div>
-                  <button className={`pickup-badge ${a.pickup_set ? 'set' : 'needed'}`} onClick={() => onTogglePickup(a.id, !a.pickup_set)}>
-                    {a.pickup_set ? 'Pickup set' : 'Driver needed'}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="card overview-panel">
-              <div className="panel-head">
                 <h3 className="panel-title">Today's priorities</h3>
                 <button className="link-btn" onClick={() => onGoToTab('todos')}>All tasks</button>
               </div>
@@ -1087,9 +1128,7 @@ function OverviewView({ retreats, attendees, expenses, todos, userEmail, activeR
                 </div>
               ))}
             </div>
-          </div>
 
-          <div className="overview-grid">
             <div className="card overview-panel">
               <div className="panel-head">
                 <h3 className="panel-title">Retreat financial health</h3>
@@ -1109,23 +1148,27 @@ function OverviewView({ retreats, attendees, expenses, todos, userEmail, activeR
                 </ResponsiveContainer>
               </div>
             </div>
+          </div>
 
-            <div className="card overview-panel">
-              <div className="panel-head">
-                <h3 className="panel-title">Upcoming retreats</h3>
-                <button className="link-btn" onClick={() => onGoToTab('retreats')}>All retreats</button>
-              </div>
-              {upcomingRetreats.length === 0 ? (
-                <div className="empty-state">Nothing else on the calendar.</div>
-              ) : upcomingRetreats.map((r) => (
-                <button key={r.id} className="upcoming-retreat-row" onClick={() => onSelectRetreat(r.id)}>
-                  <div className="upcoming-retreat-name">{r.name}</div>
-                  <div className="upcoming-retreat-meta">
-                    {fmtDate(r.start_date)} – {fmtDate(r.end_date)} · {attendees.filter((a) => a.retreat_id === r.id).length} guests confirmed
-                  </div>
-                </button>
-              ))}
+          <div className="card overview-panel" style={{ marginBottom: 16 }}>
+            <div className="panel-head">
+              <h3 className="panel-title">Upcoming retreats</h3>
+              <button className="link-btn" onClick={() => onGoToTab('retreats')}>All retreats</button>
             </div>
+            {upcomingRetreats.length === 0 ? (
+              <div className="empty-state">Nothing else on the calendar.</div>
+            ) : (
+              <div className="card-grid" style={{ paddingBottom: 14 }}>
+                {upcomingRetreats.map((r) => (
+                  <button key={r.id} className="upcoming-retreat-row" onClick={() => onSelectRetreat(r.id)}>
+                    <div className="upcoming-retreat-name">{r.name}</div>
+                    <div className="upcoming-retreat-meta">
+                      {fmtDate(r.start_date)} – {fmtDate(r.end_date)} · {attendees.filter((a) => a.retreat_id === r.id).length} guests confirmed
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1323,7 +1366,6 @@ export default function App() {
             userEmail={session.user.email}
             activeRetreatId={activeRetreatId}
             onToggleTodo={(id, done) => updateRow('ssr_todos', id, { done }, setTodos)}
-            onTogglePickup={(id, pickup_set) => updateRow('ssr_attendees', id, { pickup_set }, setAttendees)}
             onGoToTab={setTab}
             onSelectRetreat={setActiveRetreatId}
           />
@@ -1350,6 +1392,15 @@ export default function App() {
             onCreate={(data) => createRow('ssr_attendees', data, setAttendees)}
             onUpdate={(id, data) => updateRow('ssr_attendees', id, data, setAttendees)}
             onDelete={(id) => deleteRow('ssr_attendees', id, setAttendees)}
+          />
+        )}
+
+        {tab === 'flights' && (
+          <FlightsView
+            attendees={filteredAttendees}
+            retreats={retreats}
+            loading={loading.attendees}
+            activeRetreatId={activeRetreatId}
           />
         )}
 
