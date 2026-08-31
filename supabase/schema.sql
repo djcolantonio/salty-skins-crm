@@ -82,3 +82,25 @@ create policy "anon full access" on ssr_retreats for all using (true) with check
 create policy "anon full access" on ssr_attendees for all using (true) with check (true);
 create policy "anon full access" on ssr_expenses for all using (true) with check (true);
 create policy "anon full access" on ssr_todos for all using (true) with check (true);
+
+-- Leads & Subscribers — populated by the marketing site's contact form and
+-- newsletter signup, via direct inserts using the anon key (see README).
+create table if not exists ssr_leads (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  email text not null,
+  message text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists ssr_subscribers (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  created_at timestamptz not null default now()
+);
+
+alter table ssr_leads enable row level security;
+alter table ssr_subscribers enable row level security;
+
+create policy "anon full access" on ssr_leads for all using (true) with check (true);
+create policy "anon full access" on ssr_subscribers for all using (true) with check (true);
