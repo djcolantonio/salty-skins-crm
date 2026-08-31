@@ -1017,8 +1017,9 @@ function LeadsView({ leads, loading, onDelete }) {
   )
 }
 
-function SubscribersView({ subscribers, loading, onDelete }) {
+function SubscribersView({ subscribers, loading, onDelete, onBulkImport }) {
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [showImport, setShowImport] = useState(false)
   const sorted = [...subscribers].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   const emails = sorted.map((s) => s.email).filter(Boolean)
 
@@ -1029,7 +1030,10 @@ function SubscribersView({ subscribers, loading, onDelete }) {
           <h2>Subscribers</h2>
           <div className="section-sub">{subscribers.length} on the mailing list</div>
         </div>
-        <CopyAllButton emails={emails} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn sm secondary" onClick={() => setShowImport(true)}>Bulk import</button>
+          <CopyAllButton emails={emails} />
+        </div>
       </div>
 
       {loading ? (
@@ -1068,6 +1072,181 @@ function SubscribersView({ subscribers, loading, onDelete }) {
           </div>
         </Modal>
       )}
+
+      {showImport && (
+        <BulkImportSubscribersModal onClose={() => setShowImport(false)} onImport={onBulkImport} />
+      )}
+    </div>
+  )
+}
+
+function BulkImportSubscribersModal({ onClose, onImport }) {
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+
+  const { valid, invalidCount } = useMemo(() => {
+    const raw = text.split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
+    const unique = [...new Set(raw)]
+    const validEmails = unique.filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+    return { valid: validEmails, invalidCount: unique.length - validEmails.length }
+  }, [text])
+
+  async function submit() {
+    setBusy(true)
+    const summary = await onImport(valid)
+    setResult(summary)
+    setBusy(false)
+  }
+
+  return (
+    <Modal title="Bulk import subscribers" onClose={onClose}>
+      <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+        Paste emails below — one per line, or separated by commas or spaces. Anyone already on the list is skipped automatically.
+      </p>
+      <textarea
+        rows={8}
+        style={{ width: '100%', marginTop: 10 }}
+        placeholder={'jane@example.com\njohn@example.com'}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={busy || !!result}
+      />
+      <div className="section-sub" style={{ marginTop: 8 }}>
+        {valid.length} valid email{valid.length === 1 ? '' : 's'} found
+        {invalidCount > 0 ? `, ${invalidCount} skipped (not a valid email)` : ''}
+      </div>
+
+      {result && (
+        <div className="empty-state" style={{ marginTop: 12 }}>
+          Added {result.added} new subscriber{result.added === 1 ? '' : 's'}
+          {result.skipped > 0 ? ` — ${result.skipped} were already on the list.` : '.'}
+        </div>
+      )}
+
+      <div className="form-actions" style={{ marginTop: 16 }}>
+        <button className="btn ghost" onClick={onClose}>{result ? 'Close' : 'Cancel'}</button>
+        {!result && (
+          <button className="btn solid" onClick={submit} disabled={busy || valid.length === 0}>
+            {busy ? 'Importing…' : `Import ${valid.length || ''}`}
+          </button>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+/* ============================================================
+   APPLICATIONS (populated by the marketing site's retreat
+   application form — Supabase inserts land here directly)
+   ============================================================ */
+const APPLICATION_STATUSES = ['new', 'contacted', 'confirmed', 'declined']
+
+function ApplicationDetails({ app }) {
+  const rows = [
+    ['Phone', app.phone],
+    ['Instagram', app.instagram],
+    ['Retreat', app.retreat],
+    ['Room preference', app.room_preference],
+    ['Experience level', app.experience_level],
+    ['Dietary restrictions / allergies', app.dietary],
+    [
+      'Emergency contact',
+      app.emergency_contact_name || app.emergency_contact_phone
+        ? [app.emergency_contact_name, app.emergency_contact_phone].filter(Boolean).join(' — ')
+        : null,
+    ],
+    ['How they heard about us', app.referral_source],
+    ['Notes', app.notes],
+    ['Waiver acknowledged', app.waiver_acknowledged ? 'Yes' : 'No'],
+  ]
+  return (
+    <div style={{ display: 'grid', gap: 10, fontSize: 14 }}>
+      {rows.filter(([, v]) => v).map(([label, value]) => (
+        <div key={label}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-soft)' }}>{label}</div>
+          <div style={{ whiteSpace: 'pre-wrap' }}>{value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ApplicationsView({ applications, loading, onUpdateStatus, onDelete }) {
+  const [viewing, setViewing] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const sorted = [...applications].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const emails = sorted.map((a) => a.email).filter(Boolean)
+
+  return (
+    <div>
+      <div className="section-head">
+        <div>
+          <h2>Applications</h2>
+          <div className="section-sub">{applications.length} retreat application{applications.length === 1 ? '' : 's'}</div>
+        </div>
+        <CopyAllButton emails={emails} />
+      </div>
+
+      {loading ? (
+        <div className="loading-state">Loading applications…</div>
+      ) : sorted.length === 0 ? (
+        <div className="empty-state">No applications yet — they'll show up here when someone applies on the site.</div>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Retreat</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((a) => (
+                <tr key={a.id}>
+                  <td><strong>{a.full_name}</strong></td>
+                  <td>{a.email}</td>
+                  <td>{a.retreat}</td>
+                  <td>
+                    <select
+                      value={a.status}
+                      onChange={(e) => onUpdateStatus(a.id, e.target.value)}
+                      style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }}
+                    >
+                      {APPLICATION_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
+                  <td className="subtext">{fmtDate(a.created_at)}</td>
+                  <td style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn sm secondary" onClick={() => setViewing(a)}>View</button>
+                    <button className="btn sm danger" onClick={() => setConfirmDelete(a)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {viewing && (
+        <Modal title={viewing.full_name} onClose={() => setViewing(null)}>
+          <ApplicationDetails app={viewing} />
+        </Modal>
+      )}
+
+      {confirmDelete && (
+        <Modal title="Delete application?" onClose={() => setConfirmDelete(null)}>
+          <p style={{ fontSize: 14 }}>Remove {confirmDelete.full_name}'s application? This can't be undone.</p>
+          <div className="form-actions">
+            <button className="btn ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
+            <button className="btn danger" onClick={async () => { await onDelete(confirmDelete.id); setConfirmDelete(null) }}>Delete</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -1085,11 +1264,13 @@ const TasksIcon = () => (<svg {...iconProps}><path d="M4 10.5l3 3 8-8" /></svg>)
 const NotesIcon = () => (<svg {...iconProps}><path d="M4 3.5h9L16 6.5V16.5H4z" /><path d="M13 3.5V7h3" /><path d="M6.5 10h5M6.5 12.5h5" /></svg>)
 const LeadsIcon = () => (<svg {...iconProps}><rect x="3" y="5" width="14" height="10" rx="1.2" /><path d="M3.5 5.8 10 10.5l6.5-4.7" /></svg>)
 const SubscribersIcon = () => (<svg {...iconProps}><path d="M10 4a3 3 0 0 0-3 3v2.5c0 1-.4 2-1.1 2.7L5 13h10l-.9-.8A3.8 3.8 0 0 1 13 9.5V7a3 3 0 0 0-3-3z" /><path d="M8.3 15.5a1.8 1.8 0 0 0 3.4 0" /></svg>)
+const ApplicationsIcon = () => (<svg {...iconProps}><path d="M5 3.5h7l3 3V16.5H5z" /><path d="M12 3.5V7h3" /><path d="M7.2 10.2h5.6M7.2 12.7h5.6M7.2 15.2h3.4" /></svg>)
 
 const TAB_META = {
   overview: { label: 'Overview', icon: OverviewIcon, eyebrow: 'Today', title: 'Overview' },
   leads: { label: 'Leads', icon: LeadsIcon, eyebrow: 'Contact form', title: 'Leads' },
   subscribers: { label: 'Subscribers', icon: SubscribersIcon, eyebrow: 'Mailing list', title: 'Subscribers' },
+  applications: { label: 'Applications', icon: ApplicationsIcon, eyebrow: 'Retreat applications', title: 'Applications' },
   retreats: { label: 'Retreats', icon: RetreatsIcon, eyebrow: 'Trips', title: 'Retreats' },
   attendees: { label: 'Guests', icon: GuestsIcon, eyebrow: 'Roster', title: 'Guests' },
   flights: { label: 'Flights', icon: FlightsIcon, eyebrow: 'Travel', title: 'Flights' },
@@ -1334,12 +1515,13 @@ export default function App() {
   const [notes, setNotes] = useState([])
   const [leads, setLeads] = useState([])
   const [subscribers, setSubscribers] = useState([])
-  const [loading, setLoading] = useState({ retreats: true, attendees: true, expenses: true, todos: true, notes: true, leads: true, subscribers: true })
+  const [applications, setApplications] = useState([])
+  const [loading, setLoading] = useState({ retreats: true, attendees: true, expenses: true, todos: true, notes: true, leads: true, subscribers: true, applications: true })
   const [errorMsg, setErrorMsg] = useState('')
 
   const loadAll = useCallback(async () => {
     setErrorMsg('')
-    const [r, a, e, t, n, l, sub] = await Promise.all([
+    const [r, a, e, t, n, l, sub, ap] = await Promise.all([
       supabase.from('ssr_retreats').select('*').order('start_date', { ascending: true }),
       supabase.from('ssr_attendees').select('*').order('name', { ascending: true }),
       supabase.from('ssr_expenses').select('*').order('expense_date', { ascending: false }),
@@ -1347,8 +1529,9 @@ export default function App() {
       supabase.from('ssr_notes').select('*').order('created_at', { ascending: false }),
       supabase.from('ssr_leads').select('*').order('created_at', { ascending: false }),
       supabase.from('ssr_subscribers').select('*').order('created_at', { ascending: false }),
+      supabase.from('ssr_applications').select('*').order('created_at', { ascending: false }),
     ])
-    const firstError = [r, a, e, t, n, l, sub].find((res) => res.error)
+    const firstError = [r, a, e, t, n, l, sub, ap].find((res) => res.error)
     if (firstError) setErrorMsg(firstError.error.message)
     setRetreats(r.data || [])
     setAttendees(a.data || [])
@@ -1357,7 +1540,8 @@ export default function App() {
     setNotes(n.data || [])
     setLeads(l.data || [])
     setSubscribers(sub.data || [])
-    setLoading({ retreats: false, attendees: false, expenses: false, todos: false, notes: false, leads: false, subscribers: false })
+    setApplications(ap.data || [])
+    setLoading({ retreats: false, attendees: false, expenses: false, todos: false, notes: false, leads: false, subscribers: false, applications: false })
   }, [])
 
   const checkAllowed = useCallback(async (rawSession) => {
@@ -1422,6 +1606,17 @@ export default function App() {
     const { error } = await supabase.from(table).delete().eq('id', id)
     if (error) { setErrorMsg(error.message); return }
     setter((prev) => prev.filter((x) => x.id !== id))
+  }
+  async function bulkImportSubscribers(emails) {
+    if (emails.length === 0) return { added: 0, skipped: 0 }
+    const { data, error } = await supabase
+      .from('ssr_subscribers')
+      .upsert(emails.map((email) => ({ email })), { onConflict: 'email', ignoreDuplicates: true })
+      .select()
+    if (error) { setErrorMsg(error.message); return { added: 0, skipped: emails.length } }
+    await loadAll()
+    const added = data ? data.length : 0
+    return { added, skipped: emails.length - added }
   }
 
   const filteredAttendees = useMemo(
@@ -1531,6 +1726,16 @@ export default function App() {
             subscribers={subscribers}
             loading={loading.subscribers}
             onDelete={(id) => deleteRow('ssr_subscribers', id, setSubscribers)}
+            onBulkImport={bulkImportSubscribers}
+          />
+        )}
+
+        {tab === 'applications' && (
+          <ApplicationsView
+            applications={applications}
+            loading={loading.applications}
+            onUpdateStatus={(id, status) => updateRow('ssr_applications', id, { status }, setApplications)}
+            onDelete={(id) => deleteRow('ssr_applications', id, setApplications)}
           />
         )}
 

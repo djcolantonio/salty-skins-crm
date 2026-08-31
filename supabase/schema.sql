@@ -104,3 +104,29 @@ alter table ssr_subscribers enable row level security;
 
 create policy "anon full access" on ssr_leads for all using (true) with check (true);
 create policy "anon full access" on ssr_subscribers for all using (true) with check (true);
+
+-- Applications — populated by the marketing site's retreat application
+-- form, via a direct insert using the anon key (see README).
+create table if not exists ssr_applications (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  email text not null,
+  phone text not null,
+  instagram text,
+  retreat text not null,
+  room_preference text,
+  experience_level text,
+  dietary text,
+  emergency_contact_name text not null,
+  emergency_contact_phone text not null,
+  referral_source text,
+  notes text,
+  waiver_acknowledged boolean not null default false,
+  status text not null default 'new'
+    check (status in ('new','contacted','confirmed','declined')),
+  created_at timestamptz not null default now()
+);
+
+alter table ssr_applications enable row level security;
+
+create policy "anon full access" on ssr_applications for all using (true) with check (true);
