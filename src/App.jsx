@@ -870,9 +870,19 @@ function NoteForm({ initial, retreats, defaultRetreatId, onSave, onCancel }) {
 function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [expandedIds, setExpandedIds] = useState(() => new Set())
 
   const retreatName = (id) => (retreats.find((r) => r.id === id) || {}).name || 'General'
   const sorted = [...notes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+  const toggleExpanded = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   return (
     <div>
@@ -889,20 +899,34 @@ function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpda
       ) : sorted.length === 0 ? (
         <div className="empty-state">No notes yet.</div>
       ) : (
-        <div className="card-grid">
-          {sorted.map((n) => (
-            <div key={n.id} className="card">
-              <div className="meta-row">
-                {!activeRetreatId && <span>{retreatName(n.retreat_id)}</span>}
-                <span>{fmtDate(n.created_at)}</span>
+        <div className="card-grid notes-grid">
+          {sorted.map((n) => {
+            const isExpanded = expandedIds.has(n.id)
+            const isLong = (n.content || '').length > 240
+            return (
+              <div key={n.id} className="card note-card">
+                <div className="meta-row">
+                  {!activeRetreatId && <span>{retreatName(n.retreat_id)}</span>}
+                  <span>{fmtDate(n.created_at)}</span>
+                </div>
+                <div
+                  className={`desc${isLong && !isExpanded ? ' clamped' : ''}`}
+                  style={{ whiteSpace: 'pre-wrap' }}
+                >
+                  {n.content}
+                </div>
+                {isLong && (
+                  <button type="button" className="expand-toggle" onClick={() => toggleExpanded(n.id)}>
+                    {isExpanded ? 'Show less ^' : 'Show more v'}
+                  </button>
+                )}
+                <div className="card-actions">
+                  <button className="btn sm secondary" onClick={() => setEditing(n)}>Edit</button>
+                  <button className="btn sm danger" onClick={() => setConfirmDelete(n)}>Delete</button>
+                </div>
               </div>
-              <div className="desc" style={{ whiteSpace: 'pre-wrap' }}>{n.content}</div>
-              <div className="card-actions">
-                <button className="btn sm secondary" onClick={() => setEditing(n)}>Edit</button>
-                <button className="btn sm danger" onClick={() => setConfirmDelete(n)}>Delete</button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

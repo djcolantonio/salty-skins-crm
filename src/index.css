@@ -364,6 +364,44 @@ button {
   margin-bottom: 12px;
 }
 
+/* ---------- Notes: capped card height so a long note doesn't
+   blow up the whole grid and push other notes off-screen ---------- */
+.notes-grid {
+  align-items: start;
+}
+
+.note-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.note-card .desc {
+  overflow: hidden;
+}
+
+.note-card .desc.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+}
+
+.note-card .expand-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: -8px 0 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--clay);
+  cursor: pointer;
+  text-decoration: underline;
+  align-self: flex-start;
+}
+
+.note-card .expand-toggle:hover {
+  opacity: 0.8;
+}
+
 .card-actions {
   display: flex;
   gap: 8px;
