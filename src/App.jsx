@@ -8,6 +8,14 @@ import { supabase } from './supabaseClient'
    Pattern matches SafeHavenCRM: one App.jsx, Supabase for data.
    ============================================================ */
 
+// Where the "Blog" nav item sends you to create a new post — the embedded
+// Sanity Studio's create-new-document intent link for the "post" type, on
+// the marketing site. Configurable via env so it can move (e.g. once the
+// custom domain is live) without a code change.
+const BLOG_STUDIO_CREATE_URL =
+  import.meta.env.VITE_BLOG_STUDIO_URL ||
+  'https://site-rho-five-7qjhp19rc8.vercel.app/studio/intent/create/type=post'
+
 const RETREAT_STATUSES = ['planning', 'open', 'full', 'completed', 'cancelled']
 const PAYMENT_STATUSES = ['pending', 'deposit', 'paid']
 const PRIORITIES = ['low', 'medium', 'high']
@@ -1289,6 +1297,7 @@ const NotesIcon = () => (<svg {...iconProps}><path d="M4 3.5h9L16 6.5V16.5H4z" /
 const LeadsIcon = () => (<svg {...iconProps}><rect x="3" y="5" width="14" height="10" rx="1.2" /><path d="M3.5 5.8 10 10.5l6.5-4.7" /></svg>)
 const SubscribersIcon = () => (<svg {...iconProps}><path d="M10 4a3 3 0 0 0-3 3v2.5c0 1-.4 2-1.1 2.7L5 13h10l-.9-.8A3.8 3.8 0 0 1 13 9.5V7a3 3 0 0 0-3-3z" /><path d="M8.3 15.5a1.8 1.8 0 0 0 3.4 0" /></svg>)
 const ApplicationsIcon = () => (<svg {...iconProps}><path d="M5 3.5h7l3 3V16.5H5z" /><path d="M12 3.5V7h3" /><path d="M7.2 10.2h5.6M7.2 12.7h5.6M7.2 15.2h3.4" /></svg>)
+const BlogIcon = () => (<svg {...iconProps}><path d="M5 4.5h10v11H5z" /><path d="M7.3 8h5.4M7.3 10.5h5.4M7.3 13h3.4" /><path d="M13.5 4.5 15.5 6.5" /></svg>)
 
 const TAB_META = {
   overview: { label: 'Overview', icon: OverviewIcon, eyebrow: 'Today', title: 'Overview' },
@@ -1301,6 +1310,10 @@ const TAB_META = {
   expenses: { label: 'Finances', icon: FinancesIcon, eyebrow: 'Bookkeeping', title: 'Finances' },
   todos: { label: 'Tasks', icon: TasksIcon, eyebrow: 'Follow-through', title: 'Tasks' },
   notes: { label: 'Notes', icon: NotesIcon, eyebrow: 'Freeform', title: 'Notes' },
+  // Not an internal view — clicking this opens the blog's "new post" editor
+  // in a new tab, so writing a post is reachable from the same nav without
+  // duplicating the Studio's editing UI inside this app.
+  blog: { label: 'Blog', icon: BlogIcon, external: BLOG_STUDIO_CREATE_URL },
 }
 
 function daysAway(dateStr) {
@@ -1680,6 +1693,21 @@ export default function App() {
         <nav className="sidebar-nav">
           {Object.entries(TAB_META).map(([key, meta]) => {
             const Icon = meta.icon
+            if (meta.external) {
+              return (
+                <a
+                  key={key}
+                  className="nav-item"
+                  href={meta.external}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Opens the blog editor in a new tab"
+                >
+                  <Icon />
+                  {meta.label}
+                </a>
+              )
+            }
             return (
               <button key={key} className={`nav-item ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>
                 <Icon />

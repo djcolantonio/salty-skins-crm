@@ -113,6 +113,7 @@ button {
   border-radius: 8px;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
 }
 
 .nav-item:hover {
