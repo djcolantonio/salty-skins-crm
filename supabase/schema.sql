@@ -96,6 +96,7 @@ create table if not exists ssr_leads (
 create table if not exists ssr_subscribers (
   id uuid primary key default gen_random_uuid(),
   email text not null unique,
+  name text,
   created_at timestamptz not null default now()
 );
 
@@ -121,6 +122,10 @@ create table if not exists ssr_applications (
   emergency_contact_phone text not null,
   referral_source text,
   notes text,
+  primary_motivation text,
+  experience_goals text,
+  alcohol_plans text,
+  culture_acknowledged boolean not null default false,
   waiver_acknowledged boolean not null default false,
   status text not null default 'new'
     check (status in ('new','contacted','confirmed','declined')),

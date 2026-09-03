@@ -1174,6 +1174,15 @@ function BulkImportSubscribersModal({ onClose, onImport }) {
    ============================================================ */
 const APPLICATION_STATUSES = ['new', 'contacted', 'confirmed', 'declined']
 
+const LOOKING_FORWARD_LABELS = {
+  practice: 'Deepening yoga & movement practice',
+  'rest-connection': 'Rest, connection, and community',
+  adventure: 'Adventure and exploring somewhere new',
+  mix: 'A mix of all of the above',
+}
+
+const ALCOHOL_LABELS = { yes: 'Yes', no: 'No', unsure: 'Unsure' }
+
 function ApplicationDetails({ app }) {
   const rows = [
     ['Phone', app.phone],
@@ -1190,6 +1199,10 @@ function ApplicationDetails({ app }) {
     ],
     ['How they heard about us', app.referral_source],
     ['Notes', app.notes],
+    ['Most looking forward to', LOOKING_FORWARD_LABELS[app.primary_motivation] || app.primary_motivation],
+    ['What they hope to get out of it', app.experience_goals],
+    ['Plans to drink alcohol', ALCOHOL_LABELS[app.alcohol_plans] || app.alcohol_plans],
+    ['Acknowledged retreat culture/values', app.culture_acknowledged ? 'Yes' : 'No'],
     ['Waiver acknowledged', app.waiver_acknowledged ? 'Yes' : 'No'],
   ]
   return (
@@ -1232,6 +1245,7 @@ function ApplicationsView({ applications, loading, onUpdateStatus, onDelete }) {
                 <th>Name</th>
                 <th>Email</th>
                 <th>Retreat</th>
+                <th>Alcohol</th>
                 <th>Status</th>
                 <th>Date</th>
                 <th></th>
@@ -1243,6 +1257,11 @@ function ApplicationsView({ applications, loading, onUpdateStatus, onDelete }) {
                   <td><strong>{a.full_name}</strong></td>
                   <td>{a.email}</td>
                   <td>{a.retreat}</td>
+                  <td>
+                    {a.alcohol_plans === 'yes' ? (
+                      <span className="badge" style={{ background: '#f3e3c9', color: '#8a5a1e' }}>Yes</span>
+                    ) : (ALCOHOL_LABELS[a.alcohol_plans] || '—')}
+                  </td>
                   <td>
                     <select
                       value={a.status}
