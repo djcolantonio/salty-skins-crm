@@ -113,6 +113,7 @@ create table if not exists ssr_applications (
   full_name text not null,
   email text not null,
   phone text not null,
+  date_of_birth date,
   instagram text,
   retreat text not null,
   room_preference text,

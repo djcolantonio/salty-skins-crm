@@ -1186,6 +1186,7 @@ const ALCOHOL_LABELS = { yes: 'Yes', no: 'No', unsure: 'Unsure' }
 function ApplicationDetails({ app }) {
   const rows = [
     ['Phone', app.phone],
+    ['Date of birth', app.date_of_birth],
     ['Instagram', app.instagram],
     ['Retreat', app.retreat],
     ['Room preference', app.room_preference],
