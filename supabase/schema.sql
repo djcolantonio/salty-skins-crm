@@ -136,3 +136,24 @@ create table if not exists ssr_applications (
 alter table ssr_applications enable row level security;
 
 create policy "anon full access" on ssr_applications for all using (true) with check (true);
+
+-- Private client booking requests — populated by the marketing site's
+-- "Private Clients" page, via a direct insert using the anon key (see
+-- README). These are requests, not confirmed bookings — Marci follows up
+-- by email/text to lock in the actual session.
+create table if not exists ssr_private_bookings (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null,
+  phone text,
+  preferred_date date,
+  preferred_time text,
+  message text,
+  status text not null default 'new'
+    check (status in ('new','contacted','confirmed','declined')),
+  created_at timestamptz not null default now()
+);
+
+alter table ssr_private_bookings enable row level security;
+
+create policy "anon full access" on ssr_private_bookings for all using (true) with check (true);

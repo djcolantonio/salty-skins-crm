@@ -1303,6 +1303,88 @@ function ApplicationsView({ applications, loading, onUpdateStatus, onDelete }) {
   )
 }
 
+const PRIVATE_TIME_LABELS = {
+  morning: 'Morning (7–10am)',
+  midday: 'Midday (10am–1pm)',
+  afternoon: 'Afternoon (1–5pm)',
+  evening: 'Evening (5–8pm)',
+  flexible: "Flexible",
+}
+
+function PrivateBookingsView({ bookings, loading, onUpdateStatus, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const sorted = [...bookings].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+  return (
+    <div>
+      <div className="section-head">
+        <div>
+          <h2>Private Clients</h2>
+          <div className="section-sub">{bookings.length} booking request{bookings.length === 1 ? '' : 's'} — these are requests, not confirmed sessions</div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading-state">Loading booking requests…</div>
+      ) : sorted.length === 0 ? (
+        <div className="empty-state">No requests yet — they'll show up here when someone submits the Private Clients form on the site.</div>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Contact</th>
+                <th>Preferred date</th>
+                <th>Preferred time</th>
+                <th>Notes</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((b) => (
+                <tr key={b.id}>
+                  <td><strong>{b.name}</strong></td>
+                  <td>
+                    <div>{b.email}</div>
+                    {b.phone && <div className="subtext">{b.phone}</div>}
+                  </td>
+                  <td>{fmtDate(b.preferred_date)}</td>
+                  <td>{PRIVATE_TIME_LABELS[b.preferred_time] || b.preferred_time || '—'}</td>
+                  <td style={{ maxWidth: 280, whiteSpace: 'pre-wrap' }}>{b.message || '—'}</td>
+                  <td>
+                    <select
+                      value={b.status}
+                      onChange={(e) => onUpdateStatus(b.id, e.target.value)}
+                      style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }}
+                    >
+                      {APPLICATION_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
+                  <td className="subtext">{fmtDate(b.created_at)}</td>
+                  <td><button className="btn sm danger" onClick={() => setConfirmDelete(b)}>Delete</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <Modal title="Delete request?" onClose={() => setConfirmDelete(null)}>
+          <p style={{ fontSize: 14 }}>Remove {confirmDelete.name}'s booking request? This can't be undone.</p>
+          <div className="form-actions">
+            <button className="btn ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
+            <button className="btn danger" onClick={async () => { await onDelete(confirmDelete.id); setConfirmDelete(null) }}>Delete</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 /* ============================================================
    ICONS (minimal line icons for the sidebar nav)
    ============================================================ */
@@ -1317,6 +1399,7 @@ const NotesIcon = () => (<svg {...iconProps}><path d="M4 3.5h9L16 6.5V16.5H4z" /
 const LeadsIcon = () => (<svg {...iconProps}><rect x="3" y="5" width="14" height="10" rx="1.2" /><path d="M3.5 5.8 10 10.5l6.5-4.7" /></svg>)
 const SubscribersIcon = () => (<svg {...iconProps}><path d="M10 4a3 3 0 0 0-3 3v2.5c0 1-.4 2-1.1 2.7L5 13h10l-.9-.8A3.8 3.8 0 0 1 13 9.5V7a3 3 0 0 0-3-3z" /><path d="M8.3 15.5a1.8 1.8 0 0 0 3.4 0" /></svg>)
 const ApplicationsIcon = () => (<svg {...iconProps}><path d="M5 3.5h7l3 3V16.5H5z" /><path d="M12 3.5V7h3" /><path d="M7.2 10.2h5.6M7.2 12.7h5.6M7.2 15.2h3.4" /></svg>)
+const PrivateClientsIcon = () => (<svg {...iconProps}><circle cx="10" cy="7" r="3" /><path d="M4.5 16c.7-3 2.7-4.7 5.5-4.7s4.8 1.7 5.5 4.7" /><path d="M14.5 4.2c.9.3 1.5 1.2 1.5 2.3s-.6 2-1.5 2.3" /></svg>)
 const BlogIcon = () => (<svg {...iconProps}><path d="M5 4.5h10v11H5z" /><path d="M7.3 8h5.4M7.3 10.5h5.4M7.3 13h3.4" /><path d="M13.5 4.5 15.5 6.5" /></svg>)
 
 const TAB_META = {
@@ -1324,6 +1407,7 @@ const TAB_META = {
   leads: { label: 'Leads', icon: LeadsIcon, eyebrow: 'Contact form', title: 'Leads' },
   subscribers: { label: 'Subscribers', icon: SubscribersIcon, eyebrow: 'Mailing list', title: 'Subscribers' },
   applications: { label: 'Applications', icon: ApplicationsIcon, eyebrow: 'Retreat applications', title: 'Applications' },
+  privateBookings: { label: 'Private Clients', icon: PrivateClientsIcon, eyebrow: 'Booking requests', title: 'Private Clients' },
   retreats: { label: 'Retreats', icon: RetreatsIcon, eyebrow: 'Trips', title: 'Retreats' },
   attendees: { label: 'Guests', icon: GuestsIcon, eyebrow: 'Roster', title: 'Guests' },
   flights: { label: 'Flights', icon: FlightsIcon, eyebrow: 'Travel', title: 'Flights' },
@@ -1573,12 +1657,13 @@ export default function App() {
   const [leads, setLeads] = useState([])
   const [subscribers, setSubscribers] = useState([])
   const [applications, setApplications] = useState([])
-  const [loading, setLoading] = useState({ retreats: true, attendees: true, expenses: true, todos: true, notes: true, leads: true, subscribers: true, applications: true })
+  const [privateBookings, setPrivateBookings] = useState([])
+  const [loading, setLoading] = useState({ retreats: true, attendees: true, expenses: true, todos: true, notes: true, leads: true, subscribers: true, applications: true, privateBookings: true })
   const [errorMsg, setErrorMsg] = useState('')
 
   const loadAll = useCallback(async () => {
     setErrorMsg('')
-    const [r, a, e, t, n, l, sub, ap] = await Promise.all([
+    const [r, a, e, t, n, l, sub, ap, pb] = await Promise.all([
       supabase.from('ssr_retreats').select('*').order('start_date', { ascending: true }),
       supabase.from('ssr_attendees').select('*').order('name', { ascending: true }),
       supabase.from('ssr_expenses').select('*').order('expense_date', { ascending: false }),
@@ -1587,8 +1672,9 @@ export default function App() {
       supabase.from('ssr_leads').select('*').order('created_at', { ascending: false }),
       supabase.from('ssr_subscribers').select('*').order('created_at', { ascending: false }),
       supabase.from('ssr_applications').select('*').order('created_at', { ascending: false }),
+      supabase.from('ssr_private_bookings').select('*').order('created_at', { ascending: false }),
     ])
-    const firstError = [r, a, e, t, n, l, sub, ap].find((res) => res.error)
+    const firstError = [r, a, e, t, n, l, sub, ap, pb].find((res) => res.error)
     if (firstError) setErrorMsg(firstError.error.message)
     setRetreats(r.data || [])
     setAttendees(a.data || [])
@@ -1598,7 +1684,8 @@ export default function App() {
     setLeads(l.data || [])
     setSubscribers(sub.data || [])
     setApplications(ap.data || [])
-    setLoading({ retreats: false, attendees: false, expenses: false, todos: false, notes: false, leads: false, subscribers: false, applications: false })
+    setPrivateBookings(pb.data || [])
+    setLoading({ retreats: false, attendees: false, expenses: false, todos: false, notes: false, leads: false, subscribers: false, applications: false, privateBookings: false })
   }, [])
 
   const checkAllowed = useCallback(async (rawSession) => {
@@ -1808,6 +1895,15 @@ export default function App() {
             loading={loading.applications}
             onUpdateStatus={(id, status) => updateRow('ssr_applications', id, { status }, setApplications)}
             onDelete={(id) => deleteRow('ssr_applications', id, setApplications)}
+          />
+        )}
+
+        {tab === 'privateBookings' && (
+          <PrivateBookingsView
+            bookings={privateBookings}
+            loading={loading.privateBookings}
+            onUpdateStatus={(id, status) => updateRow('ssr_private_bookings', id, { status }, setPrivateBookings)}
+            onDelete={(id) => deleteRow('ssr_private_bookings', id, setPrivateBookings)}
           />
         )}
 
