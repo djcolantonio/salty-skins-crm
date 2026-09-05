@@ -843,25 +843,18 @@ function TodosView({ todos, retreats, loading, activeRetreatId, onCreate, onTogg
 /* ============================================================
    NOTES
    ============================================================ */
-function NoteForm({ initial, retreats, defaultRetreatId, onSave, onCancel }) {
-  const [f, setF] = useState(initial || { retreat_id: defaultRetreatId || '', content: '' })
+function NoteForm({ initial, onSave, onCancel }) {
+  const [f, setF] = useState(initial || { content: '' })
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
   function submit(e) {
     e.preventDefault()
-    onSave({ ...f, retreat_id: f.retreat_id || null })
+    onSave({ content: f.content })
   }
 
   return (
     <form onSubmit={submit}>
       <div className="form-grid">
-        <div className="field-group full">
-          <label>Retreat (optional)</label>
-          <select value={f.retreat_id} onChange={set('retreat_id')}>
-            <option value="">General</option>
-            {retreats.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>
-        </div>
         <div className="field-group full">
           <label>Note</label>
           <textarea value={f.content} onChange={set('content')} required style={{ minHeight: 140 }} autoFocus />
@@ -875,12 +868,11 @@ function NoteForm({ initial, retreats, defaultRetreatId, onSave, onCancel }) {
   )
 }
 
-function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpdate, onDelete }) {
+function NotesView({ notes, loading, onCreate, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [expandedIds, setExpandedIds] = useState(() => new Set())
 
-  const retreatName = (id) => (retreats.find((r) => r.id === id) || {}).name || 'General'
   const sorted = [...notes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 
   const toggleExpanded = (id) => {
@@ -897,7 +889,7 @@ function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpda
       <div className="section-head">
         <div>
           <h2>Notes</h2>
-          <div className="section-sub">{notes.length} {activeRetreatId ? 'for selected retreat' : 'across all retreats'}</div>
+          <div className="section-sub">{notes.length} note{notes.length === 1 ? '' : 's'}</div>
         </div>
         <button className="btn clay" onClick={() => setEditing('new')}>+ Add note</button>
       </div>
@@ -914,7 +906,6 @@ function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpda
             return (
               <div key={n.id} className="card note-card">
                 <div className="meta-row">
-                  {!activeRetreatId && <span>{retreatName(n.retreat_id)}</span>}
                   <span>{fmtDate(n.created_at)}</span>
                 </div>
                 <div
@@ -942,8 +933,6 @@ function NotesView({ notes, retreats, loading, activeRetreatId, onCreate, onUpda
         <Modal title={editing === 'new' ? 'Add note' : 'Edit note'} onClose={() => setEditing(null)}>
           <NoteForm
             initial={editing === 'new' ? null : editing}
-            retreats={retreats}
-            defaultRetreatId={activeRetreatId}
             onCancel={() => setEditing(null)}
             onSave={async (data) => {
               if (editing === 'new') await onCreate(data)
@@ -1049,9 +1038,106 @@ function LeadsView({ leads, loading, onDelete }) {
   )
 }
 
-function SubscribersView({ subscribers, loading, onDelete, onBulkImport }) {
+// Pulls together everything else in the CRM that shares this person's email
+// address, so a profile reads like an actual contact record instead of a
+// single isolated row — retreat history, private-class requests, and any
+// message they've sent in through the contact form.
+function matchByEmail(rows, email) {
+  if (!email) return []
+  const target = email.trim().toLowerCase()
+  return rows.filter((r) => (r.email || '').trim().toLowerCase() === target)
+}
+
+function SubscriberProfile({ subscriber, applications, attendees, privateBookings, leads, onSaveNotes }) {
+  const [notes, setNotes] = useState(subscriber.notes || '')
+  const [saved, setSaved] = useState(true)
+  const matchedApplications = matchByEmail(applications, subscriber.email)
+  const matchedAttendees = matchByEmail(attendees, subscriber.email)
+  const matchedBookings = matchByEmail(privateBookings, subscriber.email)
+  const matchedLeads = matchByEmail(leads, subscriber.email)
+  const hasRetreatHistory = matchedApplications.length > 0 || matchedAttendees.length > 0
+
+  async function saveNotes() {
+    await onSaveNotes(subscriber.id, notes)
+    setSaved(true)
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 18 }}>
+      <div>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-soft)' }}>Subscribed</div>
+        <div style={{ fontSize: 14 }}>{fmtDate(subscriber.created_at)}</div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-soft)', marginBottom: 6 }}>Retreat history</div>
+        {hasRetreatHistory ? (
+          <div style={{ display: 'grid', gap: 8 }}>
+            {matchedApplications.map((a) => (
+              <div key={a.id} className="card" style={{ padding: 10, fontSize: 13 }}>
+                Applied for <strong>{a.retreat}</strong> — <span className="badge">{a.status}</span>
+                <div className="subtext">{fmtDate(a.created_at)}</div>
+              </div>
+            ))}
+            {matchedAttendees.map((a) => (
+              <div key={a.id} className="card" style={{ padding: 10, fontSize: 13 }}>
+                Guest — {a.payment_status}
+                {a.dietary_notes && <div className="subtext">Dietary: {a.dietary_notes}</div>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="subtext" style={{ fontSize: 13 }}>No retreat applications or guest records on file yet.</div>
+        )}
+      </div>
+
+      {matchedBookings.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-soft)', marginBottom: 6 }}>Private class requests</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {matchedBookings.map((b) => (
+              <div key={b.id} className="card" style={{ padding: 10, fontSize: 13 }}>
+                Requested {fmtDate(b.preferred_date)} — <span className="badge">{b.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {matchedLeads.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-soft)', marginBottom: 6 }}>Contact messages</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {matchedLeads.map((l) => (
+              <div key={l.id} className="card" style={{ padding: 10, fontSize: 13, whiteSpace: 'pre-wrap' }}>
+                {l.message || '—'}
+                <div className="subtext">{fmtDate(l.created_at)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-soft)', marginBottom: 6 }}>Notes</div>
+        <textarea
+          value={notes}
+          onChange={(e) => { setNotes(e.target.value); setSaved(false) }}
+          style={{ minHeight: 110, width: '100%' }}
+          placeholder="Anything worth remembering about this person…"
+        />
+        <div className="form-actions" style={{ marginTop: 8 }}>
+          <button className="btn clay" onClick={saveNotes} disabled={saved}>{saved ? 'Saved' : 'Save note'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SubscribersView({ subscribers, applications, attendees, privateBookings, leads, loading, onDelete, onBulkImport, onSaveNotes }) {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [showImport, setShowImport] = useState(false)
+  const [viewing, setViewing] = useState(null)
   const sorted = [...subscribers].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   const emails = sorted.map((s) => s.email).filter(Boolean)
 
@@ -1077,6 +1163,7 @@ function SubscribersView({ subscribers, loading, onDelete, onBulkImport }) {
           <table>
             <thead>
               <tr>
+                <th>Name</th>
                 <th>Email</th>
                 <th>Date</th>
                 <th></th>
@@ -1084,15 +1171,32 @@ function SubscribersView({ subscribers, loading, onDelete, onBulkImport }) {
             </thead>
             <tbody>
               {sorted.map((sub) => (
-                <tr key={sub.id}>
+                <tr key={sub.id} className="row-clickable" onClick={() => setViewing(sub)}>
+                  <td>{sub.name || '—'}</td>
                   <td>{sub.email}</td>
                   <td className="subtext">{fmtDate(sub.created_at)}</td>
-                  <td><button className="btn sm danger" onClick={() => setConfirmDelete(sub)}>Delete</button></td>
+                  <td style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                    <button className="btn sm secondary" onClick={() => setViewing(sub)}>View</button>
+                    <button className="btn sm danger" onClick={() => setConfirmDelete(sub)}>Delete</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {viewing && (
+        <Modal title={viewing.name || viewing.email} onClose={() => setViewing(null)}>
+          <SubscriberProfile
+            subscriber={viewing}
+            applications={applications}
+            attendees={attendees}
+            privateBookings={privateBookings}
+            leads={leads}
+            onSaveNotes={onSaveNotes}
+          />
+        </Modal>
       )}
 
       {confirmDelete && (
@@ -1311,7 +1415,29 @@ const PRIVATE_TIME_LABELS = {
   flexible: "Flexible",
 }
 
+function PrivateBookingProfile({ booking }) {
+  const rows = [
+    ['Email', booking.email],
+    ['Phone', booking.phone],
+    ['Preferred date', fmtDate(booking.preferred_date)],
+    ['Preferred time', PRIVATE_TIME_LABELS[booking.preferred_time] || booking.preferred_time],
+    ['Submitted', fmtDate(booking.created_at)],
+    ['Notes', booking.message],
+  ]
+  return (
+    <div style={{ display: 'grid', gap: 10, fontSize: 14 }}>
+      {rows.filter(([, v]) => v).map(([label, value]) => (
+        <div key={label}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-soft)' }}>{label}</div>
+          <div style={{ whiteSpace: 'pre-wrap' }}>{value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function PrivateBookingsView({ bookings, loading, onUpdateStatus, onDelete }) {
+  const [viewing, setViewing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const sorted = [...bookings].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 
@@ -1337,7 +1463,6 @@ function PrivateBookingsView({ bookings, loading, onUpdateStatus, onDelete }) {
                 <th>Contact</th>
                 <th>Preferred date</th>
                 <th>Preferred time</th>
-                <th>Notes</th>
                 <th>Status</th>
                 <th>Submitted</th>
                 <th></th>
@@ -1345,7 +1470,7 @@ function PrivateBookingsView({ bookings, loading, onUpdateStatus, onDelete }) {
             </thead>
             <tbody>
               {sorted.map((b) => (
-                <tr key={b.id}>
+                <tr key={b.id} className="row-clickable" onClick={() => setViewing(b)}>
                   <td><strong>{b.name}</strong></td>
                   <td>
                     <div>{b.email}</div>
@@ -1353,8 +1478,7 @@ function PrivateBookingsView({ bookings, loading, onUpdateStatus, onDelete }) {
                   </td>
                   <td>{fmtDate(b.preferred_date)}</td>
                   <td>{PRIVATE_TIME_LABELS[b.preferred_time] || b.preferred_time || '—'}</td>
-                  <td style={{ maxWidth: 280, whiteSpace: 'pre-wrap' }}>{b.message || '—'}</td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <select
                       value={b.status}
                       onChange={(e) => onUpdateStatus(b.id, e.target.value)}
@@ -1364,12 +1488,21 @@ function PrivateBookingsView({ bookings, loading, onUpdateStatus, onDelete }) {
                     </select>
                   </td>
                   <td className="subtext">{fmtDate(b.created_at)}</td>
-                  <td><button className="btn sm danger" onClick={() => setConfirmDelete(b)}>Delete</button></td>
+                  <td style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                    <button className="btn sm secondary" onClick={() => setViewing(b)}>View</button>
+                    <button className="btn sm danger" onClick={() => setConfirmDelete(b)}>Delete</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {viewing && (
+        <Modal title={viewing.name} onClose={() => setViewing(null)}>
+          <PrivateBookingProfile booking={viewing} />
+        </Modal>
       )}
 
       {confirmDelete && (
@@ -1404,11 +1537,10 @@ const BlogIcon = () => (<svg {...iconProps}><path d="M5 4.5h10v11H5z" /><path d=
 
 const TAB_META = {
   overview: { label: 'Overview', icon: OverviewIcon, eyebrow: 'Today', title: 'Overview' },
+  retreats: { label: 'Retreats', icon: RetreatsIcon, eyebrow: 'Trips', title: 'Retreats' },
   leads: { label: 'Leads', icon: LeadsIcon, eyebrow: 'Contact form', title: 'Leads' },
   subscribers: { label: 'Subscribers', icon: SubscribersIcon, eyebrow: 'Mailing list', title: 'Subscribers' },
   applications: { label: 'Applications', icon: ApplicationsIcon, eyebrow: 'Retreat applications', title: 'Applications' },
-  privateBookings: { label: 'Private Clients', icon: PrivateClientsIcon, eyebrow: 'Booking requests', title: 'Private Clients' },
-  retreats: { label: 'Retreats', icon: RetreatsIcon, eyebrow: 'Trips', title: 'Retreats' },
   attendees: { label: 'Guests', icon: GuestsIcon, eyebrow: 'Roster', title: 'Guests' },
   flights: { label: 'Flights', icon: FlightsIcon, eyebrow: 'Travel', title: 'Flights' },
   expenses: { label: 'Finances', icon: FinancesIcon, eyebrow: 'Bookkeeping', title: 'Finances' },
@@ -1418,6 +1550,7 @@ const TAB_META = {
   // in a new tab, so writing a post is reachable from the same nav without
   // duplicating the Studio's editing UI inside this app.
   blog: { label: 'Blog', icon: BlogIcon, external: BLOG_STUDIO_CREATE_URL },
+  privateBookings: { label: 'Private Clients', icon: PrivateClientsIcon, eyebrow: 'Booking requests', title: 'Private Clients' },
 }
 
 function daysAway(dateStr) {
@@ -1775,11 +1908,6 @@ export default function App() {
     () => (activeRetreatId ? todos.filter((t) => t.retreat_id === activeRetreatId) : todos),
     [todos, activeRetreatId]
   )
-  const filteredNotes = useMemo(
-    () => (activeRetreatId ? notes.filter((n) => n.retreat_id === activeRetreatId) : notes),
-    [notes, activeRetreatId]
-  )
-
   if (!sessionChecked) return null
   if (!session) return <Gate authError={authError} onSubmit={handleLogin} />
 
@@ -1883,9 +2011,14 @@ export default function App() {
         {tab === 'subscribers' && (
           <SubscribersView
             subscribers={subscribers}
+            applications={applications}
+            attendees={attendees}
+            privateBookings={privateBookings}
+            leads={leads}
             loading={loading.subscribers}
             onDelete={(id) => deleteRow('ssr_subscribers', id, setSubscribers)}
             onBulkImport={bulkImportSubscribers}
+            onSaveNotes={(id, notes) => updateRow('ssr_subscribers', id, { notes }, setSubscribers)}
           />
         )}
 
@@ -1968,10 +2101,8 @@ export default function App() {
 
         {tab === 'notes' && (
           <NotesView
-            notes={filteredNotes}
-            retreats={retreats}
+            notes={notes}
             loading={loading.notes}
-            activeRetreatId={activeRetreatId}
             onCreate={(data) => createRow('ssr_notes', data, setNotes)}
             onUpdate={(id, data) => updateRow('ssr_notes', id, data, setNotes)}
             onDelete={(id) => deleteRow('ssr_notes', id, setNotes)}

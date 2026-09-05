@@ -509,6 +509,10 @@ tbody tr:hover {
   background: rgba(95, 143, 138, 0.05);
 }
 
+tbody tr.row-clickable {
+  cursor: pointer;
+}
+
 td.num, th.num {
   font-family: var(--font-mono);
   text-align: right;
